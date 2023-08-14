@@ -42,7 +42,7 @@ def load_data(base_path="../data"):
 
 
 class AugmentedAutoEncoder(nn.Module):
-    def __init__(self, num_question, k=100, l=50):  # Added an extra dimension 'l' for the new hidden layer
+    def __init__(self, num_question, k=200, l=50):  # Added an extra dimension 'l' for the new hidden layer
         super(AugmentedAutoEncoder, self).__init__()
 
         # Define linear functions.
@@ -66,10 +66,8 @@ class AugmentedAutoEncoder(nn.Module):
         return out
 
 
-B = 32  # Batch size
 
-
-def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
+def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch, B):
     """ Train the neural network, where the objective also includes
     a regularizer.
 
@@ -180,7 +178,7 @@ def plot_results(best_train_loss, best_val_accuracy, num_epoch):
     ax2.legend()
 
     plt.tight_layout()
-    plt.savefig('./part4_3(d)')
+    plt.savefig('./partb_3(d)')
     plt.show()
 
 
@@ -189,68 +187,52 @@ def main():
 
     torch.manual_seed(100)
     # Set model hyperparameters.
-    k = [10, 50, 100, 200, 500]
-    l = 50  # You can tune this hyperparameter too if you like
+    B_values = [1, 50, 100, 200, 500, 1000]
+    l = 30  # You can tune this hyperparameter too if you like
     model = None
     number_of_ques = train_matrix.shape[-1]
 
     # Set optimization hyperparameters.
-    lr = 0.01
+    lr = 0.1
     num_epoch = 20
     lamb = 0.
 
-    best_k = 0
+    best_batch_size = 0
     best_model = None
     best_train_loss = None
     best_val_accuracy = [0]
 
-    for each_k in k:
-        print(f"Currently, we are training at k = {each_k}")
+    batch_size_results = {}
+
+    for B in B_values:
+        print(f"Currently, we are training with batch size = {B}")
 
         # Use AugmentedAutoEncoder here instead of AutoEncoder
-        model = AugmentedAutoEncoder(number_of_ques, each_k, l)
+        model = AugmentedAutoEncoder(number_of_ques, B, l)
 
         Loss_for_traing, Accuracy_validation, maximum_accuracy = \
-            train(model, lr, lamb, train_matrix, zero_train_matrix, valid_data, num_epoch)
+            train(model, lr, lamb, train_matrix, zero_train_matrix, valid_data, num_epoch, B)
 
-        if maximum_accuracy > max(best_val_accuracy):
-            best_k = each_k
-            best_val_accuracy = Accuracy_validation
-            best_train_loss = Loss_for_traing
-            best_model = model
-
-    print(f'The best Validation accuracy is {max(best_val_accuracy)} under the k value {best_k}')
-    test_accuracy = evaluate(best_model, zero_train_matrix, test_data)
-    print(f"The test accuracy under the k value {best_k} is {test_accuracy}")
-
-    ## Plot the graphs ##
-    plot_results(best_train_loss, best_val_accuracy, num_epoch)
-
-    ### e ####
-    regularization_penalties = (0.001, 0.01, 0.1, 1)
-    regularization_penalties_results = {}
-
-    for penalty in regularization_penalties:
-        print(f'Training with penalty = {penalty}')
-        model = AugmentedAutoEncoder(number_of_ques, best_k)
-        Loss_for_traing, Accuracy_validation, maximum_accuracy = train(model, lr, penalty, train_matrix,
-                                                                       zero_train_matrix,
-                                                                       valid_data, num_epoch)
-        maximum_validation_accuracy = max(Accuracy_validation)
         test_accuracy = evaluate(model, zero_train_matrix, test_data)
-        regularization_penalties_results[penalty] = (maximum_validation_accuracy, test_accuracy)
+        batch_size_results[B] = (maximum_accuracy, test_accuracy)
 
-    regularization_penalties_str = [str(l) for l in regularization_penalties]
-    val_accs = [res[0] for res in regularization_penalties_results.values()]
-    test_accs = [res[1] for res in regularization_penalties_results.values()]
+    B_str = [str(b) for b in B_values]
+    val_accs = [res[0] for res in batch_size_results.values()]
+    test_accs = [res[1] for res in batch_size_results.values()]
+
+    # Get batch size with the best test accuracy
+    best_batch_size = max(batch_size_results, key=lambda k: batch_size_results[k][1])
+    best_test_accuracy = batch_size_results[best_batch_size][1]
+    print(
+        f"The best batch size based on test accuracy is {best_batch_size} with an accuracy of {best_test_accuracy:.3f}")
 
     plt.figure(figsize=(10, 6))
-    bars1 = plt.bar(regularization_penalties_str, val_accs, alpha=0.7, label='Validation Accuracy')
-    bars2 = plt.bar(regularization_penalties_str, test_accs, alpha=0.7, label='Test Accuracy', bottom=val_accs)
-    plt.xlabel('Lambda')
+    bars1 = plt.bar(B_str, val_accs, alpha=0.7, label='Validation Accuracy')
+    bars2 = plt.bar(B_str, test_accs, alpha=0.7, label='Test Accuracy', bottom=val_accs)
+    plt.xlabel('Batch Size')
     plt.ylabel('Accuracy')
     plt.legend()
-    plt.title('Validation and Test Accuracy for Different Lambda Values')
+    plt.title('Validation and Test Accuracy for Different Batch Sizes')
 
     for bar, acc in zip(bars1, val_accs):
         yval = bar.get_height()
@@ -260,11 +242,10 @@ def main():
         yval = bar.get_height() + val_acc
         plt.text(bar.get_x() + bar.get_width() / 2, yval - 0.05, round(acc, 3), ha='center', color='white')
 
-    plt.savefig('./part4_3(e)')
+    plt.savefig('./partb(a)_batch_sizes')
     plt.show()
-    #####################################################################
-    #                       END OF YOUR CODE                            #
-    #####################################################################
+
+# rest of the code
 
 
 if __name__ == "__main__":
